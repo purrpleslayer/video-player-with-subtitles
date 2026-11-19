@@ -13,12 +13,13 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 
-
 @Service
 public class TranscriptionService {
 
-    // Keeps cumulative token counts when requests run concurrently.    
+    // Client used to communicate with the OpenAI transcription API.
     private final RestClient restClient;
+
+    // AtomicLong keeps token totals safe when multiple requests run concurrently.
     private final AtomicLong inputTokens = new AtomicLong();
     private final AtomicLong outputTokens = new AtomicLong();
 
@@ -77,24 +78,23 @@ public class TranscriptionService {
         return response.text();
     }
 
-        // Used by the global statistics endpoint.
-        public long getInputTokens() {
-                return inputTokens.get();
-        }
+    // Used by the global statistics endpoint.
+    public long getInputTokens() {
+        return inputTokens.get();
+    }
 
-        public long getOutputTokens() {
-                return outputTokens.get();
-        }
+    public long getOutputTokens() {
+        return outputTokens.get();
+    }
 
-        // Maps the parts of the OpenAI response that the application needs.
-        private record OpenAIResponse(
-                String text,
-                Usage usage) {
-        }
+    // Maps the parts of the OpenAI response that the application needs.
+    private record OpenAIResponse(
+            String text,
+            Usage usage) {
+    }
 
-        private record Usage(
-                long input_tokens,
-                long output_tokens) {
-        }   
+    private record Usage(
+            long input_tokens,
+            long output_tokens) {
+    }   
 }
-
