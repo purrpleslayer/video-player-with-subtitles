@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
@@ -59,6 +60,27 @@ public class SubtitleClient {
                         HttpRequest.BodyPublishers.ofFile(audioFile.toPath()),
                         HttpRequest.BodyPublishers.ofString(multipartClosingBoundary, StandardCharsets.UTF_8)))
                 .build();
+    }
+
+    // Send the audio to the server and get back the generated subtitles.
+    public SubtitleResponse transcribe(File audioFile)
+            throws IOException, InterruptedException {
+
+        HttpRequest request = buildRequest(audioFile);
+
+        // Send the request and wait for the server to finish transcribing.
+        HttpResponse<String> response = httpClient.send(
+                request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+        // Report the error if server fails
+        if (response.statusCode() != 200) {
+            throw new IOException(
+                    "Subtitle request failed (HTTP " + response.statusCode() + ")");
+        }
+
+        // Turn the JSON response into Java records.
+        return mapper.readValue(response.body(), SubtitleResponse.class);
     }
 
 }
