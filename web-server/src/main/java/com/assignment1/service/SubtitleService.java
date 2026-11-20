@@ -14,6 +14,12 @@ import org.springframework.core.io.Resource;
 
 import tools.jackson.databind.JsonNode;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import com.assignment1.dto.TranscriptionDTO;
+import com.assignment1.dto.TranscriptionDTO.SubtitleSegment;
+
 @Service
 public class SubtitleService {
 
@@ -28,7 +34,7 @@ public class SubtitleService {
     }
 
     // Sends audio to Whisper and returns the transcription with timestamps.
-    public JsonNode transcribeSubtitles(MultipartFile file) {
+    public TranscriptionDTO transcribeSubtitles(MultipartFile file) {
 
         // Build a multipart request to send the audio and Whisper settings together.
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
@@ -58,12 +64,33 @@ public class SubtitleService {
 
         body.add("file", filePart);
 
-        // Send the request to Whisper and return its timestamped JSON response.
-        return restClient.post()
+        // Get Whisper's JSON response so we can extract the subtitle information.
+        JsonNode response = restClient.post()
                 .uri("/v1/audio/transcriptions")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
+
+        List<SubtitleSegment> segments = new ArrayList<>();
+
+        for (JsonNode segment : response.get("segments")) {
+            // Convert Whisper's timestamps from seconds to microseconds.
+            long startUs = Math.round(segment.get("start").asDouble() * 1_000_000);
+            long endUs = Math.round(segment.get("end").asDouble() * 1_000_000);
+
+            // Remove extra spaces from Whisper's transcription text.
+            String text = segment.get("text").asText().trim();
+
+            segments.add(new SubtitleSegment(startUs, endUs, text));
+        }
+
+        // Get the audio duration reported by Whisper for usage tracking.
+        double seconds = response.get("usage").get("seconds").asDouble();
+
+        // Return only the subtitle information needed by the video player.
+        return new TranscriptionDTO(
+                segments,
+                new TranscriptionDTO.Usage(seconds));
     }
 }

@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.assignment1.dto.TranscriptionDTO;
 import com.assignment1.service.SubtitleService;
 
 import tools.jackson.databind.JsonNode;
@@ -21,7 +22,7 @@ public class SubtitleController {
 
     // Receives audio and returns Whisper's timestamped transcription.
     @PostMapping("/api/v1/subtitles")
-    public JsonNode subtitles(@RequestParam("file") MultipartFile file) {
+    public TranscriptionDTO subtitles(@RequestParam("file") MultipartFile file) {
         return subtitleService.transcribeSubtitles(file);
     }
 }

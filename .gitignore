@@ -3,3 +3,4 @@ target/
 *.iml
 .env
 *.mp4
+*.wav
