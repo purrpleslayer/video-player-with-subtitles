@@ -2,6 +2,14 @@ package comp3011.subtitles;
 
 import java.util.List;
 import java.net.http.HttpClient;
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpRequest;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.UUID;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class SubtitleClient {
@@ -29,4 +37,28 @@ public class SubtitleClient {
     // Tracks how many seconds of audio Whisper processed.
     public record Usage(double seconds) {
     }
+
+    // Prepare the WAV file as a multipart request for the Spring Boot server.
+    private HttpRequest buildRequest(File audioFile) throws IOException {
+        String multipartBoundary = UUID.randomUUID().toString();
+
+        // Server expects audio under the field name "file".
+        String audioPartHeader = "--" + multipartBoundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n"
+                + "Content-Type: audio/wav\r\n\r\n";
+
+        String multipartClosingBoundary = "\r\n--" + multipartBoundary + "--\r\n";
+
+        // Put the audio file between the header and closing boundary.
+        return HttpRequest.newBuilder()
+                .uri(URI.create(ENDPOINT))
+                .timeout(Duration.ofMinutes(5))
+                .header("Content-Type", "multipart/form-data; boundary=" + multipartBoundary)
+                .POST(HttpRequest.BodyPublishers.concat(
+                        HttpRequest.BodyPublishers.ofString(audioPartHeader, StandardCharsets.UTF_8),
+                        HttpRequest.BodyPublishers.ofFile(audioFile.toPath()),
+                        HttpRequest.BodyPublishers.ofString(multipartClosingBoundary, StandardCharsets.UTF_8)))
+                .build();
+    }
+
 }
