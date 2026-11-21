@@ -123,15 +123,14 @@ public class VideoPlayerController {
                             subtitle.text());
                 }   
 
-        subtitles.sort(Comparator.comparingLong(SubtitleCue::startUs));
-        System.out.println("Stored subtitles: " + subtitles.size());
+                subtitles.sort(Comparator.comparingLong(SubtitleCue::startUs));
+                System.out.println("Stored subtitles: " + subtitles.size());
 
-
-        }).exceptionally(error -> {
-            // Print an error if subtitle generation fails.
-            System.err.println("Subtitle generation failed: " + error.getMessage());
-            return null;
-        });
+            }).exceptionally(error -> {
+                // Print an error if subtitle generation fails.
+                System.err.println("Subtitle generation failed: " + error.getMessage());
+                return null;
+            });
         }
     }
 
