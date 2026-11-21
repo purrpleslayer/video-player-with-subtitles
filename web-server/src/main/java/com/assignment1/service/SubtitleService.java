@@ -16,6 +16,7 @@ import tools.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.DoubleAdder;
 
 import com.assignment1.dto.TranscriptionDTO;
 import com.assignment1.dto.TranscriptionDTO.SubtitleSegment;
@@ -24,6 +25,13 @@ import com.assignment1.dto.TranscriptionDTO.SubtitleSegment;
 public class SubtitleService {
 
     private final RestClient restClient;
+
+    // Tracks the total audio duration sent to Whisper.
+    private final DoubleAdder totalUsageSeconds = new DoubleAdder();
+
+    public double getTotalUsageSeconds() {
+        return totalUsageSeconds.sum();
+    }
 
     // Configure the OpenAI client using the API key supplied at runtime.
     public SubtitleService(@Value("${OPENAI_API_KEY}") String apiKey) {
@@ -89,6 +97,11 @@ public class SubtitleService {
 
         // Get the audio duration reported by Whisper for usage tracking.
         double seconds = response.get("usage").get("seconds").asDouble();
+
+        // Add this request's duration to the total usage.
+        if (Double.isFinite(seconds) && seconds > 0) {
+        totalUsageSeconds.add(seconds);
+        }
 
         // Return only the subtitle information needed by the video player.
         return new TranscriptionDTO(
