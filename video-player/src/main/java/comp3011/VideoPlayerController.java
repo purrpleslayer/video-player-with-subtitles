@@ -37,6 +37,8 @@ public class VideoPlayerController {
     private final BiConsumer<Integer, Integer> videoSizeChangedHandler;
     private final SubtitleGenerator subtitleGenerator = new SubtitleGenerator();
     private boolean subtitlesEnabled;
+    private File currentVideoFile;
+    private boolean subtitleGenerationStarted;
     private record SubtitleCue(long startUs, long endUs, String text) {}
     private final List<SubtitleCue> subtitles = new CopyOnWriteArrayList<>();
     
@@ -65,6 +67,8 @@ public class VideoPlayerController {
         view.getStopButton().setOnAction(_ -> stopAndExit());
         view.getAudioButton().setOnAction(_ -> toggleAudioOutput());
         view.showAudioEnabled(model.isAudioOutputEnabled());
+        view.getSubtitleButton().setOnAction(_ -> toggleSubtitles());
+        view.showSubtitlesEnabled(subtitlesEnabled);
     }
 
     public void installKeyboardShortcuts(Scene scene) {
@@ -87,6 +91,9 @@ public class VideoPlayerController {
             } else if (event.getCode() == KeyCode.A) {
                 toggleAudioOutput();
                 event.consume();
+            } else if (event.getCode() == KeyCode.S) {
+                toggleSubtitles();
+                event.consume();
             }
         });
     }
@@ -96,42 +103,51 @@ public class VideoPlayerController {
     }
 
     public void play(File file) {
+        currentVideoFile = file;
+        subtitleGenerationStarted = false;
         subtitles.clear();
 
         view.setPlaybackControlsDisabled(false);
         model.play(file);
 
         if (subtitlesEnabled) {
-            // Start generating subtitles in the background while the video plays.
-            subtitleGenerator.generate(file, segments -> {
-                // Print each subtitle with its start and end time.
-                for (var subtitle : segments) {
-                    if (subtitle.text().isBlank()
-                            || subtitle.endUs() <= subtitle.startUs()) {
-                        continue;
-                    }
-
-                    subtitles.add(new SubtitleCue(
-                            subtitle.startUs(),
-                            subtitle.endUs(),
-                            subtitle.text()
-                    ));
-
-                    System.out.printf("[%.2fs - %.2fs] %s%n",
-                            subtitle.startUs() / 1_000_000.0,
-                            subtitle.endUs() / 1_000_000.0,
-                            subtitle.text());
-                }   
-
-                subtitles.sort(Comparator.comparingLong(SubtitleCue::startUs));
-                System.out.println("Stored subtitles: " + subtitles.size());
-
-            }).exceptionally(error -> {
-                // Print an error if subtitle generation fails.
-                System.err.println("Subtitle generation failed: " + error.getMessage());
-                return null;
-            });
+            startSubtitleGeneration();
         }
+    }
+
+    private void startSubtitleGeneration() {
+        if (currentVideoFile == null || subtitleGenerationStarted) {
+            return;
+        }
+
+        subtitleGenerationStarted = true;
+
+        subtitleGenerator.generate(currentVideoFile, segments -> {
+            for (var subtitle : segments) {
+                if (subtitle.text().isBlank()
+                        || subtitle.endUs() <= subtitle.startUs()) {
+                    continue;
+                }
+
+                subtitles.add(new SubtitleCue(
+                        subtitle.startUs(),
+                        subtitle.endUs(),
+                        subtitle.text()
+                ));
+
+                System.out.printf("[%.2fs - %.2fs] %s%n",
+                        subtitle.startUs() / 1_000_000.0,
+                        subtitle.endUs() / 1_000_000.0,
+                        subtitle.text());
+            }
+
+            subtitles.sort(Comparator.comparingLong(SubtitleCue::startUs));
+            System.out.println("Stored subtitles: " + subtitles.size());
+
+        }).exceptionally(error -> {
+            System.err.println("Subtitle generation failed: " + error.getMessage());
+            return null;
+        });
     }
 
     public void shutdown() {
@@ -157,6 +173,17 @@ public class VideoPlayerController {
 
     private void toggleAudioOutput() {
         model.toggleAudioOutput();
+    }
+
+    private void toggleSubtitles() {
+        subtitlesEnabled = !subtitlesEnabled;
+        view.showSubtitlesEnabled(subtitlesEnabled);
+
+        if (subtitlesEnabled) {
+            startSubtitleGeneration();
+        } else {
+            view.showSubtitle("");
+        }
     }
 
     private void stopAndExit() {
