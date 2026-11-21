@@ -72,6 +72,7 @@ public class SubtitleService {
                 .retrieve()
                 .body(JsonNode.class);
 
+        // Store each speech segment with its text and timestamps.
         List<SubtitleSegment> segments = new ArrayList<>();
 
         for (JsonNode segment : response.get("segments")) {
