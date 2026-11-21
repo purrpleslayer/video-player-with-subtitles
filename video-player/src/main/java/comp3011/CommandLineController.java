@@ -36,6 +36,7 @@ public class CommandLineController {
     private Integer displayId;
     private File videoFile;
     private String errorMessage;
+    private boolean subtitlesRequested;
     private final List<Character> requestedEffects = new ArrayList<>();
 
     public CommandLineController(String[] args) {
@@ -47,6 +48,10 @@ public class CommandLineController {
         if (helpRequested) {
             printHelp();
         }
+    }
+
+    public boolean isSubtitlesRequested() {
+        return subtitlesRequested;
     }
 
     public File getVideoFile() {
@@ -143,6 +148,7 @@ public class CommandLineController {
 	        case "--mottle-frames" -> option(() -> requestedEffects.add('m'));
 	        case "--bleed-frames" -> option(() -> requestedEffects.add('b'));
 	        case "--pepper-frames" -> option(() -> requestedEffects.add('p'));
+            case "--subtitle-frames" -> option(() -> subtitlesRequested = true);
 	
 	        default -> errorMessage = "Unknown option: " + arg;
 	    }
@@ -159,6 +165,7 @@ public class CommandLineController {
 	            case 'x' -> option(() -> maximiseRequested = true);
 	            case '1' -> option(() -> setDisplayId(1));
 	            case '2' -> option(() -> setDisplayId(2));
+                case 'S' -> option(() -> subtitlesRequested = true);
 	
 	            case 'n', 's', 'f', 'w', 'y', 'v',
 	                 'd', 'j', 'm', 'b', 'p' ->
@@ -208,6 +215,7 @@ public class CommandLineController {
         System.out.println("  -m, --mottle-frames    Add cloudy emulsion mottling");
         System.out.println("  -b, --bleed-frames     Bleed light into frames");
         System.out.println("  -p, --pepper-frames    Pepper frames with dark spots/blotches");
+        System.out.println("  -S, --subtitle-frames  Add speech-to-text subtitles to frames");
 
         System.out.println();
         System.out.println("Frame processors are applied in command-line order and may be repeated.");
