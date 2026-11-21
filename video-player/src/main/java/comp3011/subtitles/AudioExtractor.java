@@ -2,18 +2,15 @@ package comp3011.subtitles;
 
 import java.io.File;
 import java.io.IOException;
-
-import org.bytedeco.javacv.FFmpegFrameGrabber;
-import org.bytedeco.javacv.FFmpegFrameRecorder;
-import org.bytedeco.javacv.Frame;
-
-import static org.bytedeco.ffmpeg.global.avcodec.AV_CODEC_ID_PCM_S16LE;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 // Extracts audio into temporary WAV files for subtitle transcription.
 // This runs on whichever thread calls it.
 public class AudioExtractor {
 
-    // Use a separate grabber so extracting audio doesn't interfere with video playback.
+    // Use a separate process so extracting audio doesn't interfere with video playback.
     public File extract(File videoFile) throws Exception {
         return extractChunk(videoFile, 0, Long.MAX_VALUE);
     }
@@ -25,58 +22,42 @@ public class AudioExtractor {
             throw new IllegalArgumentException("Invalid audio chunk time range.");
         }
 
-        long endUs = startUs + durationUs;
-
         // Create a temporary WAV file to store the extracted audio.
         File audioFile = File.createTempFile("subtitles-", ".wav");
 
-        try (FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(videoFile)) {
-            grabber.start();
+        // Let FFmpeg handle the audio conversion instead of recording frames manually.
+        List<String> command = new ArrayList<>(List.of(
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", videoFile.getAbsolutePath(),
+                "-ss", String.format(Locale.ROOT, "%.6f", startUs / 1_000_000.0)
+        ));
 
-            // No audio no transcription
-            if (!grabber.hasAudio()) {
-                throw new IOException("The video does not contain audio.");
+        if (durationUs != Long.MAX_VALUE) {
+            command.add("-t");
+            command.add(String.format(Locale.ROOT, "%.6f", durationUs / 1_000_000.0));
+        }
+
+        command.addAll(List.of(
+                "-vn", "-ac", "1", "-ar", "16000",
+                "-c:a", "pcm_s16le", audioFile.getAbsolutePath()
+        ));
+
+        try {
+            Process process = new ProcessBuilder(command).inheritIO().start();
+
+            if (process.waitFor() != 0 || audioFile.length() <= 44) {
+                throw new IOException("Audio extraction failed.");
             }
 
-            // Move to the start of the requested audio chunk.
-            if (startUs > 0) {
-                grabber.setAudioTimestamp(startUs);
-            }
-            
-            // Convert the audio into a WAV file that Whisper can process
-            try (FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(audioFile, 1)) {
-
-                // Use mono, 16 kHz audio to keep the file smaller.
-                recorder.setFormat("wav");
-                recorder.setSampleRate(16000);
-                recorder.setAudioChannels(1);
-                recorder.setAudioCodec(AV_CODEC_ID_PCM_S16LE);
-                recorder.start();
-
-                // Read only the audio samples and write them into the WAV file.
-                Frame frame;
-                while ((frame = grabber.grabSamples()) != null) {
-
-                    if (frame.timestamp >= endUs) {
-                        break;
-                    }
-
-                    if (frame.samples != null) {
-                        recorder.recordSamples(
-                                grabber.getSampleRate(),
-                                grabber.getAudioChannels(),
-                                frame.samples);
-                    }
-                }
-            }
-
+            return audioFile;
         } catch (Exception e) {
-
             // Do not leave an incomplete audio file if extraction fails.
             audioFile.delete();
             throw e;
         }
-
-        return audioFile;
     }
 }
+
+    // Requires the ffmpeg executable on PATH.
+    // The previous JavaCV extraction gave inaccurate subtitles in testing;
+    // sample conversion or frame boundaries may be involved but no clue :<
