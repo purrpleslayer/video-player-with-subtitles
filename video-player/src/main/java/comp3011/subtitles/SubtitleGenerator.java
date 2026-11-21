@@ -12,7 +12,7 @@ import org.bytedeco.javacv.FFmpegFrameGrabber;
 
 public class SubtitleGenerator implements AutoCloseable {
 
-    private static final long CHUNK_DURATION_US = 5_000_000;
+    private static final long CHUNK_DURATION_US = 15_000_000;
 
     // Keep subtitle generation on its own thread so playback doesn't freeze.
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
