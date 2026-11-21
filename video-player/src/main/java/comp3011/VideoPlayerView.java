@@ -30,6 +30,8 @@ import javafx.scene.shape.Line;
 import javafx.scene.shape.Polygon;
 import javafx.scene.shape.SVGPath;
 import javafx.scene.shape.StrokeLineCap;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
 
 /**
  * The view part of the video player model-view-controller architecture.
@@ -46,6 +48,7 @@ public class VideoPlayerView {
     private static final int ICON_SIZE = 28;
 
     private final ImageView imageView = new ImageView();
+    private final Text subtitleText = new Text();
     private final Label statusLabel = new Label("No video loaded");
     private final Label tooltipLabel = new Label();
     private final Pane tooltipLayer = new Pane();
@@ -68,6 +71,17 @@ public class VideoPlayerView {
         videoPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         imageView.fitWidthProperty().bind(videoPane.widthProperty());
         imageView.fitHeightProperty().bind(videoPane.heightProperty());
+
+        // White sans-serif subtitles with a black outline.
+        subtitleText.setFont(Font.font("Arial", 22));
+        subtitleText.setFill(Color.WHITE);
+        subtitleText.setStroke(Color.BLACK);
+        subtitleText.setStrokeWidth(2);
+        subtitleText.setVisible(false);
+
+        videoPane.getChildren().add(subtitleText);
+        StackPane.setAlignment(subtitleText, Pos.BOTTOM_CENTER);
+        StackPane.setMargin(subtitleText, new Insets(0, 0, 20, 0));
 
         startOverButton = iconButton(createLoopIcon(false, null));
         backFiveButton = iconButton(createLoopIcon(false, "5"));
@@ -133,6 +147,11 @@ public class VideoPlayerView {
 
     public void setImage(Image image) {
         imageView.setImage(image);
+    }
+
+    public void showSubtitle(String text) {
+        subtitleText.setText(text == null ? "" : text);
+        subtitleText.setVisible(!subtitleText.getText().isBlank());
     }
 
     public void setVideoDisplaySize(double width, double height) {
