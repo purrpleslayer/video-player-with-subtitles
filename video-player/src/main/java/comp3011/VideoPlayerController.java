@@ -34,14 +34,17 @@ public class VideoPlayerController {
     private final VideoPlayerView view;
     private final BiConsumer<Integer, Integer> videoSizeChangedHandler;
     private final SubtitleGenerator subtitleGenerator = new SubtitleGenerator();
+    private boolean subtitlesEnabled;
     
 
     public VideoPlayerController(
             boolean audioEnabled,
+            boolean subtitlesEnabled,
             List<Character> requestedEffects,
             BiConsumer<Integer, Integer> videoSizeChangedHandler) {
         this.view = new VideoPlayerView();
         this.videoSizeChangedHandler = videoSizeChangedHandler;
+        this.subtitlesEnabled = subtitlesEnabled;
         model = new VideoPlayerModel(
                 audioEnabled,
                 requestedEffects,
@@ -92,20 +95,22 @@ public class VideoPlayerController {
         view.setPlaybackControlsDisabled(false);
         model.play(file);
 
-        // Start generating subtitles in the background while the video plays.
-        subtitleGenerator.generate(file, segments -> {
-            // Print each subtitle with its start and end time.
-            for (var subtitle : segments) {
-                System.out.printf("[%.2fs - %.2fs] %s%n",
-                        subtitle.startUs() / 1_000_000.0,
-                        subtitle.endUs() / 1_000_000.0,
-                        subtitle.text());
-            }
-        }).exceptionally(error -> {
-            // Print an error if subtitle generation fails.
-            System.err.println("Subtitle generation failed: " + error.getMessage());
-            return null;
-        });
+        if (subtitlesEnabled) {
+            // Start generating subtitles in the background while the video plays.
+            subtitleGenerator.generate(file, segments -> {
+                // Print each subtitle with its start and end time.
+                for (var subtitle : segments) {
+                    System.out.printf("[%.2fs - %.2fs] %s%n",
+                            subtitle.startUs() / 1_000_000.0,
+                            subtitle.endUs() / 1_000_000.0,
+                            subtitle.text());
+                }
+            }).exceptionally(error -> {
+                // Print an error if subtitle generation fails.
+                System.err.println("Subtitle generation failed: " + error.getMessage());
+                return null;
+            });
+        }
     }
 
     public void shutdown() {
