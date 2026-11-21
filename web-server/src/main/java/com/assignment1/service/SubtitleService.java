@@ -41,6 +41,7 @@ public class SubtitleService {
 
         // Request detailed JSON with timestamps for words and speech segments.
         body.add("model", "whisper-1");
+        body.add("language", "en");
         body.add("response_format", "verbose_json");
         body.add("timestamp_granularities[]", "word");
         body.add("timestamp_granularities[]", "segment");
