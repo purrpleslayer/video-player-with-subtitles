@@ -18,6 +18,8 @@ import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import java.util.List;
+import java.util.Comparator;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import comp3011.subtitles.SubtitleGenerator;
 
@@ -35,6 +37,8 @@ public class VideoPlayerController {
     private final BiConsumer<Integer, Integer> videoSizeChangedHandler;
     private final SubtitleGenerator subtitleGenerator = new SubtitleGenerator();
     private boolean subtitlesEnabled;
+    private record SubtitleCue(long startUs, long endUs, String text) {}
+    private final List<SubtitleCue> subtitles = new CopyOnWriteArrayList<>();
     
 
     public VideoPlayerController(
@@ -92,6 +96,8 @@ public class VideoPlayerController {
     }
 
     public void play(File file) {
+        subtitles.clear();
+
         view.setPlaybackControlsDisabled(false);
         model.play(file);
 
@@ -100,16 +106,32 @@ public class VideoPlayerController {
             subtitleGenerator.generate(file, segments -> {
                 // Print each subtitle with its start and end time.
                 for (var subtitle : segments) {
+                    if (subtitle.text().isBlank()
+                            || subtitle.endUs() <= subtitle.startUs()) {
+                        continue;
+                    }
+
+                    subtitles.add(new SubtitleCue(
+                            subtitle.startUs(),
+                            subtitle.endUs(),
+                            subtitle.text()
+                    ));
+
                     System.out.printf("[%.2fs - %.2fs] %s%n",
                             subtitle.startUs() / 1_000_000.0,
                             subtitle.endUs() / 1_000_000.0,
                             subtitle.text());
-                }
-            }).exceptionally(error -> {
-                // Print an error if subtitle generation fails.
-                System.err.println("Subtitle generation failed: " + error.getMessage());
-                return null;
-            });
+                }   
+
+        subtitles.sort(Comparator.comparingLong(SubtitleCue::startUs));
+        System.out.println("Stored subtitles: " + subtitles.size());
+
+
+        }).exceptionally(error -> {
+            // Print an error if subtitle generation fails.
+            System.err.println("Subtitle generation failed: " + error.getMessage());
+            return null;
+        });
         }
     }
 
