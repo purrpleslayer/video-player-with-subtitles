@@ -170,6 +170,23 @@ public class VideoPlayerController {
 
     private void onFrameReady(Image image) {
         view.setImage(image);
+        
+        if (image == null || !subtitlesEnabled) {
+            view.showSubtitle("");
+            return;
+        }
+
+        long currentUs = model.getCurrentTimestampUs();
+
+        for (SubtitleCue subtitle : subtitles) {
+            if (currentUs >= subtitle.startUs()
+                    && currentUs < subtitle.endUs()) {
+                view.showSubtitle(subtitle.text());
+                return;
+            }
+        }
+
+        view.showSubtitle("");
     }
 
     private void onStatusChanged(String status) {
