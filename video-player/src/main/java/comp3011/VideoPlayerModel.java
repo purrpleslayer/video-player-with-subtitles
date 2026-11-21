@@ -188,6 +188,11 @@ public class VideoPlayerModel {
         return audioOutputEnabled;
     }
 
+    // Returns the timestamp of the most recently displayed video frame.
+    public long getCurrentTimestampUs() {
+        return currentTimestampUs;
+    }
+
     public void stopPlayback() {
         closePlaybackResources();
         currentTimestampUs = 0;
