@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.bytedeco.javacpp.Loader;
 
 // Extracts audio into temporary WAV files for subtitle transcription.
 // This runs on whichever thread calls it.
@@ -27,7 +28,7 @@ public class AudioExtractor {
 
         // Let FFmpeg handle the audio conversion instead of recording frames manually.
         List<String> command = new ArrayList<>(List.of(
-                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                Loader.load(org.bytedeco.ffmpeg.ffmpeg.class), "-hide_banner", "-loglevel", "error", "-y",
                 "-i", videoFile.getAbsolutePath(),
                 "-ss", String.format(Locale.ROOT, "%.6f", startUs / 1_000_000.0)
         ));
