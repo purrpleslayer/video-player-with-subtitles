@@ -13,28 +13,39 @@ import java.nio.ByteBuffer;
 
 import org.bytedeco.javacv.Frame;
 
-// Draws subtitle text directly onto video frames after the other effects.
-// Currently uses test text to check that rendering works.
+// Draws timed subtitle text directly onto video frames after the other effects.
 public class FrameSubtitler extends FrameProcessor {
 
-    private static final String TEST_TEXT = "TEST TEST TEST";
+    private final SubtitleState subtitleState;
 
     private BufferedImage textImage;
     private int previousHeight;
 
+    private String previousText = "";
+
+    public FrameSubtitler(SubtitleState subtitleState) {
+        this.subtitleState = subtitleState;
+    }
+
     @Override
     public void process(Frame frame, InfoFrame info) {
-        // Only process frames with the expected three-channel pixel format.
-        if (frame.image == null
+
+        String text = subtitleState.textAt(info.timestampUs());
+
+        if (text.isBlank()
+                || frame.image == null
                 || frame.imageChannels != 3
                 || !(frame.image[0] instanceof ByteBuffer pixels)) {
             return;
         }
 
-        // Create the text image once and reuse it unless the frame height changes.
-        if (textImage == null || previousHeight != frame.imageHeight) {
-            createTextImage(frame.imageHeight);
+        // Reuse the rendered text until the subtitle or frame height changes.
+        if (textImage == null 
+            || previousHeight != frame.imageHeight
+            || !previousText.equals(text)) {
+            createTextImage(text, frame.imageHeight);
             previousHeight = frame.imageHeight;
+            previousText = text;
         }
 
         // Centre the subtitle near the bottom of the video frame.
@@ -79,7 +90,7 @@ public class FrameSubtitler extends FrameProcessor {
         }
     }
 
-    private void createTextImage(int frameHeight) {
+    private void createTextImage(String text, int frameHeight) {
         // Scale the font based on the video height.
         int fontSize = Math.max(18, frameHeight / 25);
         Font font = new Font("SansSerif", Font.BOLD, fontSize);
@@ -90,7 +101,7 @@ public class FrameSubtitler extends FrameProcessor {
         Graphics2D measure = measurement.createGraphics();
         measure.setFont(font);
 
-        int width = measure.getFontMetrics().stringWidth(TEST_TEXT) + 20;
+        int width = measure.getFontMetrics().stringWidth(text) + 20;
         int height = measure.getFontMetrics().getHeight() + 20;
         measure.dispose();
 
@@ -105,7 +116,7 @@ public class FrameSubtitler extends FrameProcessor {
 
         // Turn the text into a shape so an outline can be drawn around it.
         TextLayout layout = new TextLayout(
-                TEST_TEXT, font, graphics.getFontRenderContext());
+                text, font, graphics.getFontRenderContext());
 
         Shape outline = layout.getOutline(
                 AffineTransform.getTranslateInstance(
