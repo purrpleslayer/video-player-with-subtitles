@@ -20,6 +20,7 @@ import javafx.scene.input.KeyEvent;
 import java.util.List;
 import java.util.Comparator;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.ArrayList;
 
 import comp3011.subtitles.SubtitleGenerator;
 
@@ -59,6 +60,8 @@ public class VideoPlayerController {
                 this::onStatusChanged,
                 this::onPlaybackStateChanged,
                 this::onAudioOutputStateChanged);
+        
+        model.getSubtitleState().setEnabled(subtitlesEnabled);
 
         view.getStartOverButton().setOnAction(_ -> startOver());
         view.getBackFiveButton().setOnAction(_ -> backFiveSeconds());
@@ -106,6 +109,7 @@ public class VideoPlayerController {
         currentVideoFile = file;
         subtitleGenerationStarted = false;
         subtitles.clear();
+        model.getSubtitleState().clear();
 
         view.setPlaybackControlsDisabled(false);
         model.play(file);
@@ -123,11 +127,19 @@ public class VideoPlayerController {
         subtitleGenerationStarted = true;
 
         subtitleGenerator.generate(currentVideoFile, segments -> {
+            List<SubtitleState.Cue> frameCues = new ArrayList<>();
             for (var subtitle : segments) {
                 if (subtitle.text().isBlank()
                         || subtitle.endUs() <= subtitle.startUs()) {
                     continue;
                 }
+
+                // Share the same timed subtitle with the frame renderer.
+                frameCues.add(new SubtitleState.Cue(
+                        subtitle.startUs(),
+                        subtitle.endUs(),
+                        subtitle.text()
+                ));
 
                 subtitles.add(new SubtitleCue(
                         subtitle.startUs(),
@@ -140,6 +152,9 @@ public class VideoPlayerController {
                         subtitle.endUs() / 1_000_000.0,
                         subtitle.text());
             }
+
+            // Publish the subtitles to the frame-processing threads.
+            model.getSubtitleState().addCues(frameCues);
 
             subtitles.sort(Comparator.comparingLong(SubtitleCue::startUs));
             System.out.println("Stored subtitles: " + subtitles.size());
@@ -177,6 +192,7 @@ public class VideoPlayerController {
 
     private void toggleSubtitles() {
         subtitlesEnabled = !subtitlesEnabled;
+        model.getSubtitleState().setEnabled(subtitlesEnabled);
         view.showSubtitlesEnabled(subtitlesEnabled);
 
         if (subtitlesEnabled) {
