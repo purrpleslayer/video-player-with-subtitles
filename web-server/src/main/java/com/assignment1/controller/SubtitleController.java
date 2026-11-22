@@ -8,7 +8,6 @@ import org.springframework.web.multipart.MultipartFile;
 import com.assignment1.dto.TranscriptionDTO;
 import com.assignment1.service.SubtitleService;
 
-import tools.jackson.databind.JsonNode;
 
 @RestController
 public class SubtitleController {

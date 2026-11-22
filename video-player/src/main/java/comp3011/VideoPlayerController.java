@@ -15,12 +15,12 @@ import java.util.function.BiConsumer;
 import java.util.List;
 import java.util.ArrayList;
 
-import comp3011.subtitles.SubtitleGenerator;
-
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+
+import comp3011.subtitles.SubtitleGenerator;
 
 /**
  * The controller part of the video player model-view-controller architecture.
@@ -146,6 +146,12 @@ public class VideoPlayerController {
 
         }).exceptionally(error -> {
             System.err.println("Subtitle generation failed: " + error.getMessage());
+
+             // Allow another transcription attempt after a failed request.
+            javafx.application.Platform.runLater(() -> {
+                subtitleGenerationStarted = false;
+            });
+            
             return null;
         });
     }
@@ -182,7 +188,7 @@ public class VideoPlayerController {
 
         if (enabled) {
             startSubtitleGeneration();
-        }
+        } 
     }
 
     private void stopAndExit() {

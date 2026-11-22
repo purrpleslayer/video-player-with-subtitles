@@ -7,6 +7,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.concurrent.Callable;
 
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 
@@ -35,7 +36,7 @@ public class SubtitleGenerator implements AutoCloseable {
                     videoDurationUs = grabber.getLengthInTime();
                 }
 
-                // Process the video in five-second chunks.
+                // Process the video in 15-second chunks.
                 for (long startUs = 0; startUs < videoDurationUs; startUs += CHUNK_DURATION_US) {
                     File audioFile = null;
 
@@ -43,8 +44,12 @@ public class SubtitleGenerator implements AutoCloseable {
                         long chunkDurationUs = Math.min(CHUNK_DURATION_US, videoDurationUs - startUs);
                         audioFile = audioExtractor.extractChunk(videoFile, startUs, chunkDurationUs);
 
-                        var response = subtitleClient.transcribe(audioFile);
-
+                        // Retry this audio chunk if the server is temporarily unavailable.
+                        final File chunkFile = audioFile;
+                        var response = transcribeWithRetry(
+                            () -> subtitleClient.transcribe(chunkFile)
+                        );
+                        
                         // Adjust the timestamps to match the original video.
                         long chunkStartUs = startUs;
 
@@ -78,5 +83,38 @@ public class SubtitleGenerator implements AutoCloseable {
     @Override
     public void close() {
         executor.shutdownNow();
+    }
+
+    // Retry failed transcription requests without losing successful chunks.
+    private <T> T transcribeWithRetry(Callable<T> request) throws Exception {
+        final int maxAttempts = 30;
+        final long retryDelayMs = 4_000;
+
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return request.call();
+
+            } catch (java.io.IOException e) {
+                String message = e.getMessage();
+
+                // Don't repeatedly retry requests that are clearly invalid.
+                boolean permanentError = message != null
+                        && (message.contains("HTTP 400")
+                        || message.contains("HTTP 401")
+                        || message.contains("HTTP 403")
+                        || message.contains("HTTP 413"));
+
+                if (permanentError || attempt >= maxAttempts) {
+                    throw e;
+                }
+
+                System.err.printf(
+                        "Transcription failed: %s. Retrying chunk in 4 seconds (%d/%d)%n",
+                        message, attempt, maxAttempts
+                );
+
+                Thread.sleep(retryDelayMs);
+            }
+        }
     }
 }
