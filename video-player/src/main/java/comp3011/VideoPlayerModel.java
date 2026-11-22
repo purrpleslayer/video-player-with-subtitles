@@ -59,6 +59,7 @@ public class VideoPlayerModel {
     private final Consumer<String> statusChangedHandler;
     private final BiConsumer<Boolean, Boolean> playbackStateChangedHandler;
     private final Consumer<Boolean> audioOutputStateChangedHandler;
+    private final SubtitleState subtitleState = new SubtitleState(false);
 
 	// Keep FFmpeg decoding off the JavaFX thread so playback controls
 	// and rendering are not blocked by decoding.
@@ -208,6 +209,10 @@ public class VideoPlayerModel {
         decoderExecutor.shutdown();
     }
 
+    public SubtitleState getSubtitleState() {
+        return subtitleState;
+    }
+
     private void seekRelative(long offsetUs) {
         if (videoFile == null) {
             return;
@@ -248,7 +253,8 @@ public class VideoPlayerModel {
     private void decodeSession(File file, long startUs, long generation) {
         int workers = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() - 2));
         try (FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(file);
-             VideoProcessor<PixelFrame> processor = new VideoProcessor<>(workers, requestedEffects)) {
+            VideoProcessor<PixelFrame> processor = 
+                    new VideoProcessor<>(workers, requestedEffects, subtitleState)) {
             grabber.setImageMode(FrameGrabber.ImageMode.COLOR);
             grabber.setSampleMode(FrameGrabber.SampleMode.SHORT);
             grabber.start();

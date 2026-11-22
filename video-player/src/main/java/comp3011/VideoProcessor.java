@@ -33,7 +33,9 @@ public final class VideoProcessor<T> implements AutoCloseable {
 
     private boolean closed;
 
-    public VideoProcessor(int workerCount, List<Character> requestedEffects) {
+    public VideoProcessor(int workerCount, 
+        List<Character> requestedEffects,
+        SubtitleState subtitleState) {
         if (workerCount < 1) {
             throw new IllegalArgumentException(
                     "Worker count must be positive");
@@ -56,6 +58,9 @@ public final class VideoProcessor<T> implements AutoCloseable {
                 int index = instanceCounts[effect]++;
                 processors.add(createFrameProcessor(effect, index));
             }
+
+            // Render subtitles after the other effects.
+            processors.add(new FrameSubtitler(subtitleState));
 
             return processors;
         });
