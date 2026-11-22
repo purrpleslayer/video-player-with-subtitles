@@ -12,17 +12,15 @@ package comp3011;
 
 import java.io.File;
 import java.util.function.BiConsumer;
+import java.util.List;
+import java.util.ArrayList;
+
+import comp3011.subtitles.SubtitleGenerator;
 
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import java.util.List;
-import java.util.Comparator;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.ArrayList;
-
-import comp3011.subtitles.SubtitleGenerator;
 
 /**
  * The controller part of the video player model-view-controller architecture.
@@ -37,13 +35,9 @@ public class VideoPlayerController {
     private final VideoPlayerView view;
     private final BiConsumer<Integer, Integer> videoSizeChangedHandler;
     private final SubtitleGenerator subtitleGenerator = new SubtitleGenerator();
-    private boolean subtitlesEnabled;
     private File currentVideoFile;
     private boolean subtitleGenerationStarted;
-    private record SubtitleCue(long startUs, long endUs, String text) {}
-    private final List<SubtitleCue> subtitles = new CopyOnWriteArrayList<>();
     
-
     public VideoPlayerController(
             boolean audioEnabled,
             boolean subtitlesEnabled,
@@ -51,7 +45,6 @@ public class VideoPlayerController {
             BiConsumer<Integer, Integer> videoSizeChangedHandler) {
         this.view = new VideoPlayerView();
         this.videoSizeChangedHandler = videoSizeChangedHandler;
-        this.subtitlesEnabled = subtitlesEnabled;
         model = new VideoPlayerModel(
                 audioEnabled,
                 requestedEffects,
@@ -108,13 +101,12 @@ public class VideoPlayerController {
     public void play(File file) {
         currentVideoFile = file;
         subtitleGenerationStarted = false;
-        subtitles.clear();
         model.getSubtitleState().clear();
 
         view.setPlaybackControlsDisabled(false);
         model.play(file);
 
-        if (subtitlesEnabled) {
+        if (model.getSubtitleState().isEnabled()) {
             startSubtitleGeneration();
         }
     }
@@ -141,12 +133,6 @@ public class VideoPlayerController {
                         subtitle.text()
                 ));
 
-                subtitles.add(new SubtitleCue(
-                        subtitle.startUs(),
-                        subtitle.endUs(),
-                        subtitle.text()
-                ));
-
                 System.out.printf("[%.2fs - %.2fs] %s%n",
                         subtitle.startUs() / 1_000_000.0,
                         subtitle.endUs() / 1_000_000.0,
@@ -156,8 +142,7 @@ public class VideoPlayerController {
             // Publish the subtitles to the frame-processing threads.
             model.getSubtitleState().addCues(frameCues);
 
-            subtitles.sort(Comparator.comparingLong(SubtitleCue::startUs));
-            System.out.println("Stored subtitles: " + subtitles.size());
+            System.out.println("Stored subtitles: " + frameCues.size());
 
         }).exceptionally(error -> {
             System.err.println("Subtitle generation failed: " + error.getMessage());
@@ -191,14 +176,12 @@ public class VideoPlayerController {
     }
 
     private void toggleSubtitles() {
-        subtitlesEnabled = !subtitlesEnabled;
-        model.getSubtitleState().setEnabled(subtitlesEnabled);
-        view.showSubtitlesEnabled(subtitlesEnabled);
+        boolean enabled = !model.getSubtitleState().isEnabled();
+        model.getSubtitleState().setEnabled(enabled);
+        view.showSubtitlesEnabled(enabled);
 
-        if (subtitlesEnabled) {
+        if (enabled) {
             startSubtitleGeneration();
-        } else {
-            view.showSubtitle("");
         }
     }
 
@@ -213,23 +196,6 @@ public class VideoPlayerController {
 
     private void onFrameReady(Image image) {
         view.setImage(image);
-        
-        if (image == null || !subtitlesEnabled) {
-            view.showSubtitle("");
-            return;
-        }
-
-        long currentUs = model.getCurrentTimestampUs();
-
-        for (SubtitleCue subtitle : subtitles) {
-            if (currentUs >= subtitle.startUs()
-                    && currentUs < subtitle.endUs()) {
-                view.showSubtitle(subtitle.text());
-                return;
-            }
-        }
-
-        view.showSubtitle("");
     }
 
     private void onStatusChanged(String status) {
